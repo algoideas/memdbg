@@ -1,0 +1,55 @@
+在调试过程中，遇到coredump堆栈信息无法跳出c库的情况，需要debug版本的c库
+
+
+一、编译过程
+
+ tar -xvf glibc-2.11.1.tar.gz 
+
+ tar -xvf glibc-ports-2.11.tar.gz 
+把glibc-ports-2.11文件夹重命名为ports放入glibc-2.11.1中；
+
+cd glibc-2.11.1
+mkdir glibc_build
+cd glibc_build
+../configure --host=arm-linux-gnueabi CC=arm-hisiv200-linux-gcc CFLAGS="-g -O2 -U_FORTIFY_SOURCE -march=armv7-a -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=vfpv3-d16" --enable-add-ons  --prefix=/homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install  libc_cv_forced_unwind=yes libc_cv_c_cleanup=yes --enable-kernel=2.6.0
+make
+
+#Hisi V300或V310默认编译属性如下
+#-march=armv7-a -mcpu=cortex-a9 -mfloat-abi=softfp -mfpu=vfpv3-d16
+
+二、使用（将下面两个debug版本的c库覆盖原先的c库）
+
+ cp ./ld-linux.so.3  /lib/
+
+cp ./libc.so.6  /lib/libc.so.6 
+
+
+1、编译错误1：
+configure: WARNING:
+*** These auxiliary programs are missing or incompatible versions: msgfmt
+*** some features will be disabled.
+*** Check the INSTALL file for required versions.
+checking LD_LIBRARY_PATH variable... contains current directory
+configure: error:
+*** LD_LIBRARY_PATH shouldn't contain the current directory when
+*** building glibc. Please change the environment variable
+*** and run configure again.
+第一个警告不用管它，第二个LD_LIBRARY_PATY也会有错？仔细看提示，不应包含当前路径。
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+注意：修改LD_LIBRARY_PATH环境变量
+LD_LIBRARY_PATH="/homeb/minjie.yu/sme_tool/usr/lib:"
+改成
+LD_LIBRARY_PATH="/homeb/minjie.yu/sme_tool/usr/lib"
+
+
+2、编译错误2(暂未解决)：
+--host=arm-linux-gnueabi 表示目标机器为 arm-linux-gnueabi
+如果使用 --host=arm-linux会出现如下错误：
+/tmp/ccJp0ERe.s: Assembler messages:
+/tmp/ccJp0ERe.s:47: Error: selected processor does not support ARM mode `rfs r2'
+/tmp/ccJp0ERe.s:57: Error: selected processor does not support ARM mode `wfs r3'
+
+
+--host=arm-hisiv200-linux -》 --host=arm-linux-gnueabi

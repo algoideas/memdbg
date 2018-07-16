@@ -1,0 +1,64 @@
+Valgrind
+
+使用valgrind检查内存问题使用方法：
+
+1.把valgrind.tar.gz解压到挂载调试的/mnt下。
+
+2.输入 
+./valgrind/bin/valgrind --error-limit=no --leak-check=full --undef-value-errors=no --show-reachable=yes ./demo
+检查内存泄露，则采用
+./valgrind/bin/valgrind --error-limit=no --leak-check=full --tool=memcheck ./demo
+
+
+3.针对valgrind的输出报告检查修改代码问题。
+
+========================================================
+【可能遇到问题解决方法】
+1.提示ld-linux.so.3问题跑不起来
+把ld-linux.so.3 拷贝到机顶盒名字为/lib/ld-2.11.1.so
+
+可以重新采用链接so的方式：
+ln -sf /mnt/valgrind/ld-linux.so.3 ld-linux.so.3
+(ld-linux.so.3是指向ld-2.11.1.so盒子重启前要还原链接否则要重烧rootbox，还原链接是在/lib下ln -sf /lib/ld-2.11.1.so ld-linux.so.3)
+
+2.输出的提示没有符合表显示"？？？",编译的demo不用striped。
+
+========================================================
+【valgrind内存工具的选项】
+1、leak-check
+    --leak-check=<no|summary|yes|full> [default: summary]
+    用于控制内存泄漏检测力度。
+    no，不检测内存泄漏；
+    summary，仅报告总共泄漏的数量，不报告具体泄漏位置；
+    yes/full，报告泄漏总数、泄漏的具体位置。
+2、show-reachable
+    --show-reachable=<yes|no> [default: no]
+    用于控制是否检测控制范围之外的泄漏，比如全局指针、static指针等。
+#include <stdlib.h>
+#include <stdio.h>
+char *gptr = NULL;
+int main(void)
+{
+    gptr = (char *)malloc(10);
+    return 0;
+}
+对应以上代码，若--show-reachable为no，则valgrind不报告内存泄漏，否则会报告。
+3、undef-value-errors
+--undef-value-errors=<yes|no> [default: yes]
+用于控制是否检测代码中使用未初始化变量的情况。
+对应以下代码：
+    int a;
+    printf("a = %d \n", a);
+若 --undef-value-errors＝no，则valgrind不报告错误，否则报告“Use of uninitialised value ...”的错误。
+4、其他选项
+    --log-file=filename 将结果输出到文件。
+    --log-socket=192.168.0.1:12345 输出到网络。
+    --trace-children=<yes|no> [default: no]
+    --track-fds=<yes|no> [default: no]
+    --log-fd=<number> [default: 2, stderr]
+    --xml=<yes|no> [default: no]
+    --num-callers=<number> [default: 12]
+    --show-below-main=<yes|no> [default: no]
+
+
+

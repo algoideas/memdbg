@@ -1,0 +1,149 @@
+--- src/debug/common/dbgcom.c.orig	Mon Mar 22 20:25:17 1999
++++ src/debug/common/dbgcom.c	Tue Mar 23 14:18:17 1999
+@@ -27,6 +27,7 @@
+ #define DOS_DESCRIPTOR_COUNT	128
+ 
+ long mem_handles[MEM_HANDLE_COUNT];
++unsigned long block_base_addresses[MEM_HANDLE_COUNT];
+ unsigned short descriptors[DESCRIPTOR_COUNT];
+ unsigned short dos_descriptors[DOS_DESCRIPTOR_COUNT];
+ NPX npx;
+@@ -211,8 +212,15 @@
+ 	.text								\n\
+ 	.align  2,0x90							\n\
+ _change_handle:								\n\
++	pushl	%ebx							\n\
+ 	pushl	%ecx							\n\
++	pushw	%bx							\n\
++	pushw	%cx							\n\
++	popl	%ebx /* get address of block */				\n\
+ 	xorl	%ecx,%ecx						\n\
++	orl	%edx, %edx						\n\
++	jnz	CL1							\n\
++	xorl	%ebx, %ebx /* zero address if freeing */		\n\
+ CL1:									\n\
+ 	.byte	0x2e 							\n\
+ 	cmpl	%eax,_mem_handles(,%ecx,4)				\n\
+@@ -222,14 +230,17 @@
+ 	movw	_my_ds,%ax						\n\
+ 	movw	%ax,%ds							\n\
+ 	movl	%edx,_mem_handles(,%ecx,4)				\n\
++	movl	%ebx,_block_base_addresses(,%ecx,4)			\n\
+ 	pop	%ds							\n\
+ 	popl	%ecx							\n\
++	popl	%ebx							\n\
+ 	ret								\n\
+ CL2:									\n\
+ 	incl	%ecx							\n\
+ 	cmpl	$256,%ecx	/* MEM_HANDLE_COUNT */			\n\
+ 	jl	CL1							\n\
+ 	popl	%ecx							\n\
++	popl	%ebx							\n\
+ 	ret								\n"
+ );
+ 
+@@ -600,28 +611,70 @@
+   _clear_break_DPMI();
+ }
+ 
+-static int invalid_addr(unsigned a, unsigned len)
++static void setup_handle_and_address(unsigned a, __dpmi_meminfo *m)
++{
++  int i, best;
++  unsigned bestdiff;
++  unsigned long base;
++  unsigned linear;
++  __dpmi_get_segment_base_address(__djgpp_app_DS, &base);
++  linear = a + base;
++  best = -1;
++  bestdiff = 0xffffffff;
++  for (i = 0; i < MEM_HANDLE_COUNT; i++)
++    {
++      if (block_base_addresses[i]
++	  && linear > block_base_addresses[i]
++	  && (block_base_addresses[i] - linear) < bestdiff)
++	{	
++	  best = i;
++	  bestdiff = block_base_addresses[i] - linear;
++	}
++    }
++  m->handle = mem_handles[best];
++  m->address = linear - block_base_addresses[best];
++}
++
++static int invalid_addr(unsigned a, unsigned len, int wr)
+ {
+   /* Here we assume expand up writable code.  We could check the rights to
+      be sure, but that's a waste unless *_child routines fixed to know about
+      different selectors. */
+ 
+   unsigned limit;
++  if (a <= 4096)
++    return 1; /* Null page */
+   limit = __dpmi_get_segment_limit(__djgpp_app_DS);
+-  if(4096 <= a             /* First page is used for NULL pointer detection. */
+-  && a <= limit            /* To guard against limit < len. */
+-  && a - 1 <= limit - len  /* To guard against limit <= a + len - 1. */
+-     )
+-    return 0;
+-/*  printf("Invalid access to child, address %#x length %#x  limit: %#x\n", a, len, limit);
+-  if (can_longjmp)
+-    longjmp(debugger_jmpbuf, 1); */
+-  return 1;
++  if (a > limit || (a - 1) > (limit - len))
++      return 1; /* Beyond limit */
++  {
++    unsigned short *attr;
++    __dpmi_meminfo m;
++    unsigned long startpg;
++    unsigned long npgs;
++
++    startpg = (unsigned long)a & ~4095;
++    npgs = (len + 4095) / 4096;
++    attr = alloca(npgs * sizeof(unsigned short));
++    setup_handle_and_address(startpg, &m);
++    m.size = npgs;
++    if (__dpmi_get_page_attributes(&m, attr) == 0)
++      {
++	int i;
++	for (i = 0; i < npgs; i++)
++	  {
++	    if (((attr[i] & 7) == 0) /* uncommitted */
++		|| (wr && !(attr[i] & 8))) /* read-only */
++		return 1;
++	  }
++      }
++  }
++  return 0;
+ }
+ 
+ int read_child(unsigned child_addr, void *buf, unsigned len)
+ {
+-  if (invalid_addr(child_addr, len))
++  if (invalid_addr(child_addr, len, 0))
+     return 1;
+   movedata(__djgpp_app_DS, child_addr, my_ds, (int)buf, len);
+   return 0;
+@@ -629,7 +682,7 @@
+ 
+ int write_child(unsigned child_addr, void *buf, unsigned len)
+ {
+-  if (invalid_addr(child_addr, len))
++  if (invalid_addr(child_addr, len, 1))
+     return 1;
+   movedata(my_ds, (int)buf, __djgpp_app_DS, child_addr, len);
+   return 0;
+@@ -671,6 +724,13 @@
+   movedata(a_tss.tss_fs,0,my_ds,(unsigned)&si,sizeof(si));
+   memset(mem_handles,0,sizeof(mem_handles));
+   mem_handles[0] = si.memory_handle;
++  /* Kludge: The base address of the first handle is also the base
++     address of the DS segment. */
++  {
++    unsigned long b;
++    __dpmi_get_segment_base_address(__djgpp_app_DS, &b);
++    block_base_addresses[0] = b;
++  }
+   memset(descriptors,0,sizeof(descriptors));
+   descriptors[0] = si.cs_selector;
+   descriptors[1] = si.ds_selector;

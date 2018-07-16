@@ -1,0 +1,66 @@
+Oct 14 1999
+
+v0.32
+
+	* Various minor compilation and documentation fixes.
+
+Aug 12 1999
+
+v0.31
+	* Have Linux use mmap for allocations.  This is more memory
+	efficient and apparently faster (perhaps because of not
+	needing to swap).
+	* Add YAMD_LOGFILE as an alias for YAMD_LOGFILE_NAME; it's
+	nicer to type.
+	* Sensible Makefile defaults are now used on both platforms
+	without needing to edit.
+	* Minor bug fixes and documentation updates.
+
+Jun 5 1999
+
+v0.30
+	* Fix problems with libc activities causing lossage.
+	* YAMD_ENABLE is now gone; YAMD is effectively always
+	enabled.  It couldn't be avoided.
+
+Apr 7 1999
+
+v0.23
+	* Fix constructor troubles (I hope).
+	* Fix bug: logging NULL block when memory low.
+	* Change logfile format a bit, to let it work with gsymify.
+	* run-yamd now works under DJGPP.
+
+Apr 5 1999
+
+v0.22
+	* Fix silly traceback bug.
+
+Apr 5 1999
+
+v0.21
+	* Fix misuse of $(DJGPP) in Makefile.
+	* Document constructor bug.
+	* Clean up some more.
+
+Apr 3 1999
+
+v0.2
+	* Change the block lookup algorithm to use a hash table.
+	* Avoid trying to check magic on blocks that don't need it.
+	These two fixes yield a large speedup.
+	* Fix a few bugs, including misbehavior of memalign when
+	aligning to boundaries > 4096.
+	* Clean up the code a bit.
+
+Mar 29 1999
+
+v0.11:
+	* Fix build problem with 2.0 kernels.
+	* Change packaging a bit.
+	* Mention new binutils in README.
+
+
+Mar 25 1999
+
+v0.1: First public release.

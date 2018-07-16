@@ -1,0 +1,124 @@
+#! /bin/sh
+#
+# Run specified executable with yamd loaded.
+
+
+#  This file and the rest of YAMD is copyright (C) 1999 by Nate Eldredge.
+#  There is no warranty whatever; I disclaim responsibility for any
+#  damage caused.  Released under the GNU General Public License (see the
+#  file COPYING).
+
+
+libdir=@LIBDIR@
+bindir=@BINDIR@
+
+yamd_so=$libdir/libyamd-dynamic.so
+symify=$bindir/do-syms
+
+while getopts rdfa:o:l:sc:nvh c; do
+    case $c in
+	r)
+	    repair_corrupted=1
+	    ;;
+	d)
+	    die_on_corrupted=1
+	    ;;
+	f)
+	    check_front=1
+	    ;;
+	a) 
+	    default_alignment=$OPTARG
+	    ;;
+	o)
+	    output_file=$OPTARG
+	    ;;
+	l)
+	    log_level=$OPTARG  # Fixme: Accept symbolic loglevels (INFO, etc)
+	    ;;
+	s)
+	    statically_linked=1
+	    ;;
+	i)  
+	    children_inherit=1
+	    ;;
+	c)
+	    yamd_so=$OPTARG
+	    ;;
+	n)
+	    no_symify=1
+	    ;;
+	v)
+	    echo YAMD version @VERSION@
+	    exit 0
+	    ;;
+	h)
+	    echo "YAMD: Yet Another Malloc Debugger"
+	    echo "Usage: $0 [options] prog args..."
+	    echo "See accompanying documentation for details."
+	    exit 0
+	    ;;
+    esac
+done
+
+if [ ! $statically_linked ]; then
+    new_ld_preload=${LD_PRELOAD}${LD_PRELOAD:+:}$yamd_so
+fi
+
+if [ $children_inherit ]; then
+    echo Warning: Child inheriting may be a bad idea.
+    child_ld_preload=$new_ld_preload
+else
+    child_ld_preload=$LD_PRELOAD
+fi
+
+echo LD_PRELOAD will be \"${new_ld_preload}\"
+
+shift `expr $OPTIND - 1`  # Remove option args
+
+if [ ! $TMPDIR ]; then
+    TMPDIR=/tmp
+fi
+
+temp_outfile=$TMPDIR/yamd-out.$$
+rm -f $temp_outfile
+
+echo Running "$@"
+echo Temp output to $temp_outfile
+echo "*********"
+
+(exec
+YAMD_FORMER_LD_PRELOAD=$LD_PRELOAD \
+YAMD_DEFAULT_ALIGNMENT=${default_alignment:-1}  \
+YAMD_LOGFILE_NAME=$temp_outfile \
+YAMD_LOGLEVEL=${log_level:-1} \
+YAMD_REPAIR_CORRUPTED=${repair_corrupted:-0} \
+YAMD_DIE_ON_CORRUPTED=${die_on_corrupted:-1} \
+YAMD_CHECK_FRONT=${check_front:-0} \
+YAMD_CHILD_LD_PRELOAD=$child_ld_preload \
+YAMD_ENABLE=1 \
+LD_PRELOAD=$new_ld_preload \
+"$@"
+)
+
+echo "*********"
+# Unfortunately it seems we can't substitute a redirection
+# in a variable...
+if [ $output_file ]; then
+    if [ -z $no_symify ]; then
+	echo Running symify, this may take some time...
+	$symify $1 <$temp_outfile >$output_file && rm -f $temp_outfile
+    else
+	# Don't use mv; output_file may be a terminal.
+	cat $temp_outfile >$output_file && rm -f $temp_outfile
+    fi
+else
+    if [ -z $no_symify ]; then
+	echo Running symify, this may take some time...
+	$symify $1 <$temp_outfile 1>&2 && rm -f $temp_outfile
+    else
+	# Don't use mv; output_file may be a terminal.
+	cat $temp_outfile 1>&2 && rm -f $temp_outfile
+    fi
+fi
+
+echo Done.

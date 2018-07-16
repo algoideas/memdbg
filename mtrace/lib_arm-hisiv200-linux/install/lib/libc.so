@@ -1,0 +1,5 @@
+/* GNU ld script
+   Use the shared library, but some functions are only in
+   the static library, so try that secondarily.  */
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP ( /homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install/lib/libc.so.6 /homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install/lib/libc_nonshared.a  AS_NEEDED ( /homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install/lib/ld-linux.so.3 ) )

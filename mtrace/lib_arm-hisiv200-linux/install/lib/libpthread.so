@@ -1,0 +1,5 @@
+/* GNU ld script
+   Use the shared library, but some functions are only in
+   the static library, so try that secondarily.  */
+OUTPUT_FORMAT(elf32-littlearm)
+GROUP ( /homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install/lib/libpthread.so.0 /homeb/minjie.yu/linux/memdbg/mtrace/glibc-2.11.1/glibc_build/install/lib/libpthread_nonshared.a )

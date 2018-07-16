@@ -1,0 +1,43 @@
+一、 安装
+1. autoconf
+# wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz 
+# tar -zxvf autoconf-2.69.tar.gz 
+# cd autoconf-2.69
+# ./configure
+# make; make install
+
+2. automake
+# wget http://ftp.gnu.org/gnu/automake/automake-1.14.tar.gz
+# tar -zxvf automake-1.14.tar.gz 
+# cd automake-1.14
+# ./bootstrap.sh
+# ./configure
+# make; make install
+
+3. valgrind
+# wget http://valgrind.org/downloads/valgrind-3.12.0.tar.bz2
+# tar -jxvf valgrind-3.12.0.tar.bz2
+# cd valgrind-3.12.0
+# ./autogen.sh
+
+修改configure脚本 armv7*)  改为 armv7* | arm )
+
+arm-hisiv200-linux... 这些命令要在环境变量下，不用多说。 
+# ./configure --host=arm-hisiv200-linux CC=arm-hisiv200-linux-gcc CPP=arm-hisiv200-linux-cpp  CXX=arm-hisiv200-linux-g++ --prefix=/mnt/valgrind (知道上面为嘛要添加 | arm了吧，当然是这个host后面的是arm-hisiv200-linux 撒，如果你的host是armv7的可以不用改咯，就是增加了一个条件而已， prefix后面的值特别关键，这个后面的目录就是你的开发板上面的目录哦，所以一定要确保这个目录有足够的空间，免得到时候又要重新编译呢，编完后貌似有90m+，所以保证你设置的目录是足够大的，我的/mnt下面有125m 另外 prefix指定的路径也在我们的编译机器上面，编译出来的文件当然是在我们的编译机器上面咯)
+# sudo make
+
+ #sudo make install
+
+
+如果走到这里成功了，那么去看我们的编译机器上面的/mnt目录下面是不是有valgrind 这个东西，这个就是在--prefix 那里指定了的。
+
+
+当年我在搞这个的时候，前面的步骤分分钟搞定了，tm就是把valgrind移植到板子上面的时候出了问题，我当时只是把valgrind-3.12.0/coregrind/valgrind（这个是我的源文件目录下面的呢，编译成功了，这里就有程序了）我就直接copy到板子上面运行了，结果 valgrind failed to start tool 'memcheck' for platform 'arm-linux': not a direcory  fuck...  后面搜索了很久，都tm不是正确的解决方案，神马把memcheck-arm-linux cp到板子上面的某个lib里面，然后为这个lib设置环境变量，tm的你们自己试成功过再来说好嘛，统统报告valgrind failed to start tool 'memcheck' for platform 'arm-linux': not a direcory ，陶腾了快一天，在某个老外的问题里面窥探到，真的是窥探，里面也没有说明到具体问题，我只是看了这句话觉得特别有道理，老外的话在此 This is because you did not copy all Valgrind files.
+
+If I remember correctly, when I last cross-compiled Valgrind for PPC I
+copied Valgrind as follows from build system to target:
+* run make install on the build system.
+* copy $PREFIX/bin/valgrind and the entire directory
+$PREFIX/lib/valgrind from the build system to the target system.  你们看看是不是和我的不一样， 就这样去试了，怎么搞的呢，把我的编译机器上面编译出来的文件/mnt/valgrind里面这一坨，这下面有很多文件的工93.9m，统统cp到板子的/mnt/valgrind里面，一定要是/mnt下面哦，上面那个prefix 指定的，然后就把/mnt/valgrind/bin 
+目录添加到环境变量里面去了，看看这个bin下面有啥，是不是看到了期待好久的valgrind 然后在那里都可以运行它了哈，妥妥的搞定了。。。。
+

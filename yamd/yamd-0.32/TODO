@@ -1,0 +1,76 @@
+Hey Emacs, this is a -*- text -*- file.
+
+To do:
+
+- yamd.c is getting large and messy.  Should be split into several
+  files.  This will cause a bit of namespace pollution and force me to
+  type messy names starting with underscores, but is probably worth it.  
+
+- Figure out possible /tmp race with script.
+
+- Use file version numbers (yamd0nn.zip etc) and change the website to
+  show past versions.
+
+  First part done.
+
+- log_vprintf really ought to use vsnprintf when possible.  It looks
+  like DJGPP should have this before too long; that's a good thing.
+  Don't forget to correctly handle the overflow case.
+
+- Audit for correct aliasing so that gcc 2.95 and its
+  -fstrict-aliasing can be used.
+
+  Have had a look and nothing seems horribly wrong.
+
+- Write the "interpreting logfile" docs.
+
+- Fill freshly allocated memory with some (user-specified) pattern.
+  Currently we get random garbage (if regular malloc is used) or zeros
+  (if mmap); neither is probably very good for finding uninitialized
+  memory bugs.
+
+- autoconf might be a good idea.  The manual HAVE_* macros are getting
+  messy.
+
+- Add more INFO-level logging, of normal events.  ??? Like what ???
+
+- Output could be prettier.  Work on do-syms.  Also have it find the
+  executable name automagically.
+
+- Add checking for use of uninitialized memory.  386 has no write-only
+  pages, so set all pages not-present and have the fault handler barf
+  if they are read.  Handling each page individually would be slower
+  and involve a lot more bookkeeping, so maybe just deal with the
+  whole block.  But: This will probably catch only the grossest bugs,
+  so I wonder if it's really worth it.  Also, I'd rather see the fault
+  handler gone.
+
+- I wonder if the signal handler should be removed entirely.  This
+  would have the following advantages:
+
+  * Eliminates system-specific fault handling code.
+
+  * Traceback stuff could be much simplified, as we will always be on
+    the call chain.  Much better portability.
+
+    But: Under Linux, when dynamically loaded, postmortem debugging
+    can't use YAMD.  This means we need to describe the related block
+    at once; we won't be able to get that info later.
+
+    OTOH, I could write a GDB script that emulates describe_address by
+    walking the block chain itself.  This makes it GDB-dependent,
+    however, and maybe depending on postmortem debugging working is
+    unwise... hmm.
+
+    This may also just be a GDB or glibc/ld.so bug.  Try it with 4.18
+    and 2.1.1.
+
+- Clean up some of the ugly address arithmetic.
+
+- Fix signal handler under DJGPP.  Hmm... dang hard.
+
+- Eliminate all the -D's on the compilation command line by making
+  some sort of config.h that the Makefile creates.
+
+- Check for suitable DPMI server on startup; else warn user.
+

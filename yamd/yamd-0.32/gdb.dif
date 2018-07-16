@@ -1,0 +1,24 @@
+--- gdb/go32targ.bak	Sun Sep  8 23:46:46 1996
++++ gdb/go32targ.c	Sat Mar 20 23:14:34 1999
+@@ -269,11 +269,18 @@
+ #if 0
+   printf_unfiltered("go32_xfer_memory %x %x %d %d\n", memaddr, myaddr, len, write);
+ #endif
++  int v;
+   if (write)
+-    write_child(memaddr, myaddr, len);
++    v = write_child(memaddr, myaddr, len);
+   else
+-    read_child(memaddr, myaddr, len);
+-  return len;
++    v = read_child(memaddr, myaddr, len);
++  if (v != 0) /* Address was bad */
++    {
++      errno = EIO;
++      return -1;
++    }
++  else
++    return len;
+ }
+ 
+ /* 컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴컴� */

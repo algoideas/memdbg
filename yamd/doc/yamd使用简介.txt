@@ -1,0 +1,119 @@
+Linux内存调试工具YAMD的使用
+作者：华清远见
+C语言作为应用最为广泛的编程语言不仅向程序员提供了功能强大的各种运算符，而且赋予使用者对动态内存分配很大的控制权。在给大家带来很多便利的同时，这种自由可能会引起严重的内存使用问题。这些问题会导致程序崩溃或是随着时间的推移使得系统性能大幅减低。
+
+内存泄漏和缓冲区溢出是最常见的问题。在复杂的程序中，这类问题很难由程序员直接检测。在这种情况下，内存调试工具就可以大显身手，极大的简化了内存使用问题的检测工程，提高开发效率。
+
+大家比较熟悉的内存调试工具MEMWATCH就不讨论了，这里向大家介绍另外一个好用的内存调试工具YAMD。（华清远见原创，转载请注明出处）
+
+YAMD(Yet Another Malloc Debugger)由Nate Eldredge开发，可检测C/C++中内存分配相关的问题。常用的版本是0.32，下载源码包yamd-0.32.tar.gz后解压并运行make编译，接着运行make install安装。
+
+下面演示该工具的使用。程序源代码test.c如下：
+
+#include <stdio.h>
+        #include <stdlib.h>
+
+int main()
+        {
+                char *p1, *p2, *str;
+                int i;
+
+        p1 = (char *)malloc(100);
+                p2 = (char *)malloc(100);
+                str = (char *)malloc(100);
+                p1 = p2;
+                for (i=1; i<=100; i++) str[i] = ‘\0’;
+                free(p1);
+                free(str);
+
+        return 0;
+        }
+
+首先编译test.c生成可执行程序test
+
+# gcc -o test test.c -g –Wall
+
+接着运行yamd和test
+
+# run-yamd ./test 2>test.log
+
+LD_PRELOAD will be “/usr/local/lib/libyamd-dynamic.so”
+        Running ./test
+        Temp output to /tmp/yamd-out.18460
+        *********
+        *********
+        Running symify, this may take some time…
+        Done.
+
+查看日志文件test.log 
+        # cat test.log
+
+segmentation fault
+        YAMD version 0.32
+        Starting run: ./test 
+        Executable: /root/test
+        Virtual program size is 1868 K
+        Time is Mon Sep 5 15:26:39 2011
+
+default_alignment = 1
+        min_log_level = 1
+        repair_corrupted = 0
+        die_on_corrupted = 1
+        check_front = 0
+
+INFO: Normal allocation of this block
+        Address 0xb786df9c, size 100
+        Allocated by malloc at
+                /lib/libc.so.6(__libc_malloc+0x1e0)[0x1810b0]
+                ./test[0x8048409]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+
+INFO: Normal allocation of this block
+        Address 0xb786af9c, size 100
+        Allocated by malloc at
+                /lib/libc.so.6(__libc_malloc+0x1e0)[0x1810b0]
+                ./test[0x8048419]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+
+INFO: Normal allocation of this block
+        Address 0xb7867f9c, size 100
+        Allocated by malloc at
+                /lib/libc.so.6(__libc_malloc+0x1e0)[0x1810b0]
+                ./test[0x8048429]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+
+INFO: Normal deallocation of this block
+        Address 0xb786af9c, size 100
+        Allocated by malloc at
+                 /lib/libc.so.6(__libc_malloc+0x1e0)[0x1810b0]
+                ./test[0x8048419]
+                 /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+        Freed by free at
+                /lib/libc.so.6(cfree+0xd6)[0x180ec6]
+                ./test[0x8048441]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+
+ERROR: Crash
+                ./test[0x8048453]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+        Tried to write address 0xb7868000
+        Seems to be part of this block:
+        Address 0xb7867f9c, size 100
+        Allocated by malloc at
+                /lib/libc.so.6(__libc_malloc+0x1e0)[0x1810b0]
+                ./test[0x8048429]
+                /lib/libc.so.6(__libc_start_main+0xe7)[0x126ce7]
+                ./test[0x8048361]
+        Address in question is at offset 100 (out of bounds)
+        Will dump core after checking heap.
+
+红色部分很明确的指出程序在往地址0xb7867f9c的内存写时出错，该地址已越界。
+
+灵活的运用各种内存调试工具可以帮助程序员高效的检测各种内存使用问题，大大提高了开发效率。当然，良好的编程习惯和规范的代码书写能有效的避免此类问题的出现。
+

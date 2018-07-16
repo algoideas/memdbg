@@ -1,0 +1,333 @@
+YAMD, Yet Another Malloc Debugger
+
+By Nate Eldredge, <neldredge@hmc.edu>
+
+Overview
+--------
+
+YAMD is Yet Another Malloc Debugger.  It's a package to help in
+finding bugs related to dynamic memory allocation.  At present, it
+works under Linux/x86 and DJGPP.  It provides several features not
+found in most other such packages.
+
+It can be found at http://www3.hmc.edu/~neldredge/yamd/.
+
+Features
+--------
+
+* YAMD uses the processor's paging mechanisms to enforce the
+  boundaries of allocated blocks.  This means that:
+    
+    - Attempts to both read and write out of bounds will be trapped.
+
+    - Traps will occur on the instruction that caused the bad access,
+      rather than at some later time.  This makes it easier to find
+      the culprit.
+
+* Each operation is logged, not just with file and line number, but
+  with a complete traceback.  This is especially helpful if most of
+  your memory allocation is done through a few common functions.
+
+* YAMD emulates `malloc' and friends at a very low level, meaning that
+  indirect `malloc' calls from other library functions (like `strdup')
+  are caught as well.  This also catches C++'s `new' and `delete'.
+
+* No changes whatever are needed to your source.  Under Linux, dynamic
+  loading of YAMD is supported, in which case you may not even need to
+  re-link the program.
+
+* Of course, it does all the usual checks you'd expect from a malloc
+  debugger: checking for multiple freeing, memory leaks, etc.
+
+
+Requirements
+------------
+
+Under Linux, you need a recent version of Binutils; 2.8 should work.
+Also, you will get much better results if you have glibc 2.1 and a
+recent (late 2.1 or 2.2) kernel.  Most features will still work with
+earlier ones, though, including libc 5; but see "Caveats" below.
+
+Under DJGPP, YAMD will only work if you run under plain DOS with
+CWSDPMI as your DPMI server.  Most other DPMI servers only implement
+the DPMI 0.9 spec, which lacks some vital features.  386MAX may work;
+I haven't tried it.  Also, some problems in the debuggers can make
+debugging awkward without special patches; see "Caveats".  Patched
+debuggers are available at http://www.cartsys.com/eldredge/n/yamd/.
+
+You should have GCC, Make, Textutils, Fileutils, and Sed installed.
+
+For either system, you will need a large amount of virtual memory
+available.  Swap is fine.  Running YAMD on GCC compiling one of its
+own large source files with -O2 required some 130MB of virtual memory
+just for that process!  (This is because of the (necessarily) highly
+inefficient allocation scheme.)
+
+Installing
+----------
+
+Unpack the archive.  Obviously you've done that or you wouldn't be
+reading this.
+
+The default installation directory is /usr/local on Unix, and your
+DJGPP directory on DJGPP.  Edit the Makefile if you want to change
+this.
+
+I have tested YAMD with GCC 2.95.1 and it works, so previous warnings
+about this version probably do not apply.  The code looks to be OK
+with respect to aliasing problems.
+
+Run `make' to compile.  `make test' will compile some sample programs
+in the `tests' subdirectory.  Just now there is no formal testsuite,
+but each prints what it should do when it runs with YAMD.  You can
+also look at them to see the sort of errors caught.
+
+Get the appropriate permissions and run `make install'.
+
+
+Compiling your programs
+-----------------------
+
+Some special considerations are needed in compiling to take advantage
+of YAMD.
+
+YAMD linked statically:
+
+     Use `-g' when compiling, and do not use `-fomit-frame-pointer'.
+     When linking, replace `gcc' with `yamd-gcc' and similarly with
+     `gxx' or `g++'.  (These names are based on what you specified as
+     CC and CXX in the Makefile.)  Do not use `-s' when linking or
+     strip the binary.
+
+     NOTE: YAMD can no longer be disabled when compiled in.  This is
+     an unfortunate but necessary side-effect of some other bugfixes.
+     Thus, you should not compile YAMD into production binaries.
+
+YAMD linked dynamically:
+
+     Use `-g', not `-fomit-frame-pointer' or `-s'.  If your binary was
+     originally built like this, you need not rebuild it.
+
+
+Running your program and controlling YAMD
+-----------------------------------------
+
+With the `run-yamd' shell script:
+===========================================================
+
+Syntax: run-yamd [options] program args...
+
+Note: `program' should be the path to your program; do not rely on
+PATH being searched, because it isn't.
+
+On DJGPP, you'll need to have bash and shell-utils installed, and run
+bash explicitly.  So:
+
+bash run-yamd [options] program args...
+
+And use forward slashes for specifying `program'.
+
+Options:
+	
+  -r : When corrupted magic bytes are found, fix ("repair") them after
+   reporting to prevent further reports.  Default is to leave them.
+
+  -d : If corrupted magic bytes are found, abort the program after
+   reporting ("die").  Default is to continue.
+
+  -f : Check the front (prefix) of blocks, instead of the end.  This
+   is useful for catching negative overruns. 
+
+  -a nnn : Set default alignment of allocated blocks for which
+   alignment is not specified (as with `memalign').  Must be a power
+   of 2, and should be as small as possible to catch the most bugs.
+   Default is 1, which provides the best checking, and is also faster
+   (it avoids a lot of manual overrun checking).  The unaligned memory
+   accesses have not proven to be a problem.
+
+  -o file : Direct the log output to `file'.  Default is stderr.
+
+  -l n : Set the minimum log level to n.  1 is INFO, 2 is WARNING, 3
+   is ERROR.
+
+  -s : Inform run-yamd that the program in question has YAMD
+   statically linked with it, to prevent it from loading it
+   dynamically (which is the default).
+
+  -i : When loading YAMD dynamically, have other programs exec'd by
+   the child inherit YAMD.  This is not well tested and may fail if
+   the grandchildren were linked against a different libc version, for
+   instance.
+
+  -c file : Specify the YAMD shared object file.  Default is
+   LIBDIR/libyamd-dynamic.so.
+
+  -n : Omit the step which symifies the log (it can be slow).  This is
+   probably not useful except for testing.
+
+  -v : Print version and exit.
+
+  -h : Print short help message and exit.
+
+With environment variables:
+===========================
+
+Internally, YAMD is controlled by some environment variables; run-yamd
+just sets them for you.  You can also set them yourself when
+necessary.  FLAGS should be set to "0" or "1".
+
+  YAMD_ENABLE (flag) : It is no longer necessary to set this variable.
+
+  YAMD_REPAIR_CORRUPTED (flag) : Corresponds to -r option.
+
+  YAMD_DIE_ON_CORRUPTED (flag) : Corresponds to -d option.
+
+  YAMD_CHECK_FRONT (flag) : Corresponds to -f option.
+
+  YAMD_DEFAULT_ALIGNMENT : Corresponds to -a option.
+
+  YAMD_LOGLEVEL : Corresponds to -l option.
+
+  YAMD_LOGFILE : Name of the file to which log output should be
+  written.  Note that symification must be done manually.
+
+  YAMD_LOGFILE_NAME : Same as above, for compatibility.
+
+  LD_PRELOAD : On Linux, if YAMD should be dynamically loaded, this
+  variable must include the YAMD shared object name.
+
+  YAMD_CHILD_LD_PRELOAD : Value of LD_PRELOAD to pass to new
+  processes.  Unless you want them to inherit YAMD (see -i), this
+  should be the value of LD_PRELOAD before the YAMD shared object was
+  added.
+
+You will probably also want to symify the logfile to translate the
+addresses into file and line numbers.  The `do-syms' program
+accomplishes this.  It takes the executable as its only argument,
+reads the logfile from stdin, and writes the symified version to
+stdout.
+
+
+Interpreting the logfile
+------------------------
+
+To be written.  Hopefully the logfile is fairly self-explanatory.
+
+
+Debugging
+---------
+
+If your program does something erroneous, it may crash, giving you a
+core dump or traceback.  (On Linux, you will also get a traceback and
+details about the faulty operation in the logfile.)  You can then use
+usual postmortem debugging techniques to find the bug.
+
+You can also run your YAMD'd program under a debugger.  Be sure to set
+the environment variables appropriately.  In my experience, statically
+YAMD'd programs work better under a debugger.  The function
+`__yamd_describe_address' is intended for use within debuggers and,
+when called with an address as its single arg, will print a
+description of the block, if any, in or near which the address lies.
+
+For DJGPP, see also "Caveats".
+
+
+Caveats
+-------
+
+General:
+
+You may catch libc operations.  As of v0.30, the only effect of this
+should be cluttering of your logfile, and perhaps bogus memory leaks.
+(This seems to be particularly true with DJGPP.)  Use the tracebacks
+to decide whether it really is your bug.
+
+Some assumptions are made about the workings of the libc mallocs.  If
+you are using your own malloc and family, you're on your own.
+
+You really do need a lot of virtual memory for a project of any size!
+
+DJGPP:
+
+The current DJGPP debuggers don't check page protection, and so they
+will crash if they try to access a page that YAMD has protected.  A
+patch is included as `dbgcom.dif'; it's against the latest development
+DJGPP version.  You will need to recompile libdbg and the appropriate
+debuggers.  Patched debuggers are available at
+http://www.cartsys.com/eldredge/n/yamd/.
+
+GDB has an additional bug whereby it ignores info on whether an
+address is accessible; a patch is included as `gdb.dif'.
+
+DJGPP v2.01 has a bug that makes test10 fail with an infinite
+traceback; if you see this, upgrade to 2.02 or the latest version.
+
+If you have troubles with running out of memory when you think you
+shouldn't, see if FAQ chapter 15 helps.
+
+I repeat: You must run under plain DOS with CWSDPMI!
+
+
+Linux:
+
+glibc 2.1 or above is highly recommended.  It provides the
+`backtrace_symbols' function which will allow your tracebacks to show
+functions inside shared libraries (like libc).  Your shared libraries
+must be unstripped for this to work.
+
+If you have only glibc 2.0 or less, shared library symbols will not be
+reliable.  You can get libc symbols by linking with `-static'.
+Otherwise, you should be suspicious of any entry with an address in
+the mmap area (around 0x40000000).
+
+If you have only libc5, the above still applies.  Furthermore,
+dynamically loaded YAMD does not work at all with libc5.  I suggest
+you upgrade soon, for many more reasons than just this package.
+
+A 2.2 or late 2.1 kernel will give you the full path to the executable
+in the logfile.  Otherwise, you'll see only its device and inode.
+
+GDB does not seem to interact well with shared libraries, particularly
+in core dumps.  Perhaps this is because YAMD is not linked to the
+program, but merely preloaded.  Statically linked YAMD is more
+successful.
+
+I have not tested the run-yamd shell script with any shell except
+bash.  If it needs changes, please let me know.
+
+Bugs
+----
+
+None known and confirmed, but they surely exist.
+
+
+Credits
+-------
+
+Some concepts were inspired by the following pieces of software:
+
+* MSS by Juan Jesus Alcolea Picazo and Peter Palotas
+
+* ElectricFence by Bruce Perens
+
+* The GNU C library, by quite a lot of people.
+
+However, all code is original.
+
+
+Thanks also to Salvador Eduardo Tropea, Alex Lozano, Eli Zaretskii,
+Martijn Versteegh, Michael Reggio, Waldemar Schultz, and probably
+several people I have forgotten, for their comments, suggestions, and
+bug reports.
+
+
+Contact
+-------
+
+Please send suggestions, bug reports, etc. to me, Nate Eldredge, at
+<neldredge@hmc.edu>.
+
+This file and the rest of YAMD is copyright (C) 1999 by Nate Eldredge.
+There is no warranty whatever; I disclaim responsibility for any
+damage caused.  Released under the GNU General Public License (see the
+file COPYING).
